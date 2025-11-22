@@ -45,3 +45,4 @@ next-env.d.ts
 /backend/temp
 /backend/temp/*
 
+.env
