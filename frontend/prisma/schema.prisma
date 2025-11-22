@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cv            CV?
+  interviewSessions InterviewSession[]
+}
+
+model CV {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  personalInfo Json
+  summary      String?
+
+  skills       Json
+  projects     Json
+
+  education    Json
+  experience   Json
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+
+
+model InterviewSession {
+  id            String   @id @default(cuid())
+  sessionId     String   // Groups all questions in one interview
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fieldId       String
+  questionId    Int
+  videoPath     String
+  videoFilename String
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([fieldId])
+  @@index([sessionId])
+}
+
