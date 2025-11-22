@@ -1,123 +1,105 @@
+// CV Routes - Handles CV CRUD operations
 const express = require("express");
 const router = express.Router();
-const { PrismaClient } = require("@prisma/client");
-const jwt = require("jsonwebtoken");
 
-const prisma = require("../lib/prisma");
-// Middleware to verify token
-const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+// Import services
+const cvService = require("../services/cvService");
+const authMiddleware = require("../middleware/auth");
 
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-
+/**
+ * GET /api/cv
+ * Get user's CV
+ */
+router.get("/", authMiddleware, async (req, res) => {
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your-secret-key-change-in-production"
-    );
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
-  }
-};
-
-// Get CV
-router.get("/", verifyToken, async (req, res) => {
-  try {
-    const cv = await prisma.cV.findUnique({
-      where: { userId: req.userId },
-    });
+    const cv = await cvService.findCVByUserId(req.userId);
 
     if (!cv) {
-      return res.status(404).json({ message: "CV not found" });
+      return res.status(404).json({
+        message: "CV not found",
+        hasCV: false,
+      });
     }
 
     res.json(cv);
   } catch (error) {
     console.error("Get CV error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({
+      message: "Failed to retrieve CV"
+    });
   }
 });
 
-// Create CV
-router.post("/", verifyToken, async (req, res) => {
+/**
+ * POST /api/cv
+ * Create or update user's CV
+ */
+router.post("/", authMiddleware, async (req, res) => {
   try {
     const cvData = req.body;
 
     // Check if CV already exists
-    const existingCV = await prisma.cV.findUnique({
-      where: { userId: req.userId },
-    });
+    const existingCV = await cvService.findCVByUserId(req.userId);
 
     if (existingCV) {
       // Update existing CV
-      const updatedCV = await prisma.cV.update({
-        where: { userId: req.userId },
-        data: {
-          personalInfo: cvData.personalInfo,
-          summary: cvData.summary,
-
-          skills: cvData.skills,
-          projects: cvData.projects,
-
-          education: cvData.education,
-          experience: cvData.experience,
-        },
+      const updatedCV = await cvService.updateCV(req.userId, cvData);
+      return res.json({
+        message: "CV updated successfully",
+        cv: updatedCV,
       });
-
-      return res.json(updatedCV);
     }
 
     // Create new CV
-    const cv = await prisma.cV.create({
-      data: {
-        personalInfo: cvData.personalInfo,
-        summary: cvData.summary,
-
-        skills: cvData.skills,
-        projects: cvData.projects,
-
-        education: cvData.education,
-        experience: cvData.experience,
-      },
+    const newCV = await cvService.createCV(req.userId, cvData);
+    res.status(201).json({
+      message: "CV created successfully",
+      cv: newCV,
     });
-
-    res.status(201).json(cv);
   } catch (error) {
-    console.error("Create CV error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Create/Update CV error:", error);
+    res.status(500).json({
+      message: "Failed to save CV. Please try again."
+    });
   }
 });
 
-// Update CV
-router.put("/", verifyToken, async (req, res) => {
+/**
+ * PUT /api/cv
+ * Update or create user's CV (upsert)
+ */
+router.put("/", authMiddleware, async (req, res) => {
   try {
     const cvData = req.body;
 
-    const data = {
-      personalInfo: cvData.personalInfo,
-      summary: cvData.summary,
+    // Save CV (creates if doesn't exist, updates if exists)
+    const cv = await cvService.saveCV(req.userId, cvData);
 
-      skills: cvData.skills,
-      projects: cvData.projects,
-
-      education: cvData.education,
-      experience: cvData.experience,
-    };
-
-    const cv = await prisma.cV.upsert({
-      where: { userId: req.userId },
-      update: data,
-      create: { userId: req.userId, ...data },
+    res.json({
+      message: "CV saved successfully",
+      cv,
     });
-
-    res.json(cv);
   } catch (error) {
-    console.error("Update CV error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Save CV error:", error);
+    res.status(500).json({
+      message: "Failed to save CV. Please try again."
+    });
+  }
+});
+
+/**
+ * GET /api/cv/check
+ * Check if user has a CV
+ */
+router.get("/check", authMiddleware, async (req, res) => {
+  try {
+    const hasCV = await cvService.userHasCV(req.userId);
+    res.json({ hasCV });
+  } catch (error) {
+    console.error("Check CV error:", error);
+    res.status(500).json({
+      message: "Failed to check CV status"
+    });
   }
 });
 
