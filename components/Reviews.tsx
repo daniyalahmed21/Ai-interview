@@ -61,7 +61,7 @@ export default function Reviews() {
                 ))}
               </div>
               <p className="text-gray-700 leading-relaxed italic">
-                "{review.content}"
+                &quot;{review.content}&quot;
               </p>
             </div>
           ))}

@@ -61,7 +61,7 @@ export default function DashboardHome() {
           Welcome back{user?.name ? `, ${user.name}` : ""}!
         </h1>
         <p className="text-gray-600">
-          Ready to ace your next interview? Let's get started.
+          Ready to ace your next interview? Let&apos;s get started.
         </p>
       </div>
 
