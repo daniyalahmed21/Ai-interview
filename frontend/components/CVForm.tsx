@@ -56,17 +56,9 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
       },
       summary: "",
       skills: [""],
-      projects: [{ title: "", role: "", techStack: [], description: "" }],
+      projects: [],
       education: [{ degree: "", institute: "", graduationYear: "", fyp: "" }],
-      experience: [
-        {
-          jobTitle: "",
-          company: "",
-          startDate: "",
-          endDate: "",
-          responsibilities: "",
-        },
-      ],
+      experience: [],
     }
   );
 
@@ -103,6 +95,36 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
         },
       ],
     });
+  };
+
+  // Remove an experience entry
+  const removeExperience = (index: number) => {
+    const newExperience = cvData.experience.filter((_, i) => i !== index);
+    setCvData({ ...cvData, experience: newExperience });
+  };
+
+  // Update a specific project entry
+  const updateProject = (index: number, field: string, value: string | string[]) => {
+    const newProjects = [...cvData.projects];
+    newProjects[index] = { ...newProjects[index], [field]: value };
+    setCvData({ ...cvData, projects: newProjects });
+  };
+
+  // Add a new empty project entry
+  const addProject = () => {
+    setCvData({
+      ...cvData,
+      projects: [
+        ...cvData.projects,
+        { title: "", role: "", techStack: [], description: "" },
+      ],
+    });
+  };
+
+  // Remove a project entry
+  const removeProject = (index: number) => {
+    const newProjects = cvData.projects.filter((_, i) => i !== index);
+    setCvData({ ...cvData, projects: newProjects });
   };
 
   // Update a specific education entry
@@ -172,29 +194,28 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
             />
             <input
               type="tel"
-              placeholder="Phone"
+              placeholder="Phone (Optional)"
               value={cvData.personalInfo.phone}
               onChange={(e) => updatePersonalInfo("phone", e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              required
             />
             <input
               type="text"
-              placeholder="Location (e.g., New York, USA)"
+              placeholder="Location (Optional - e.g., New York, USA)"
               value={cvData.personalInfo.location}
               onChange={(e) => updatePersonalInfo("location", e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
             <input
               type="url"
-              placeholder="LinkedIn URL"
+              placeholder="LinkedIn URL (Optional)"
               value={cvData.personalInfo.linkedin}
               onChange={(e) => updatePersonalInfo("linkedin", e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
             <input
               type="url"
-              placeholder="GitHub URL"
+              placeholder="GitHub URL (Optional)"
               value={cvData.personalInfo.github}
               onChange={(e) => updatePersonalInfo("github", e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -204,7 +225,10 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
 
         {/* Professional Summary Section */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Professional Summary</h2>
+          <div>
+            <h2 className="text-xl font-bold">Professional Summary</h2>
+            <p className="text-sm text-gray-500 mb-4">Optional - A brief overview of your background</p>
+          </div>
           <textarea
             rows={4}
             placeholder="Write a brief summary about yourself..."
@@ -214,10 +238,73 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
           />
         </div>
 
-        {/* Experience Section */}
+        {/* Projects Section */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Work Experience</h2>
+            <h2 className="text-xl font-bold">Projects</h2>
+            <button
+              type="button"
+              onClick={addProject}
+              className="text-blue-600 font-semibold hover:text-blue-700"
+            >
+              + Add Project
+            </button>
+          </div>
+
+          {cvData.projects.length === 0 ? (
+            <p className="text-gray-500 text-sm">No projects added yet. Click &quot;+ Add Project&quot; to add your projects.</p>
+          ) : (
+            cvData.projects.map((project, index) => (
+              <div key={index} className="mb-4 space-y-2 border-b pb-4 last:border-b-0">
+                <div className="flex justify-between items-start">
+                  <input
+                    type="text"
+                    placeholder="Project Title"
+                    value={project.title}
+                    onChange={(e) => updateProject(index, "title", e.target.value)}
+                    className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeProject(index)}
+                    className="ml-2 text-red-600 hover:text-red-700 px-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Your Role (e.g., Lead Developer, Team Member)"
+                  value={project.role}
+                  onChange={(e) => updateProject(index, "role", e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Tech Stack (comma-separated: React, Node.js, MongoDB)"
+                  value={project.techStack.join(", ")}
+                  onChange={(e) => updateProject(index, "techStack", e.target.value.split(",").map(s => s.trim()))}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <textarea
+                  placeholder="Project description, key features, and your contributions..."
+                  value={project.description}
+                  onChange={(e) => updateProject(index, "description", e.target.value)}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  rows={3}
+                />
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Experience Section (Optional) */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-bold">Work Experience</h2>
+              <p className="text-sm text-gray-500">Optional - Add if you have work experience</p>
+            </div>
             <button
               type="button"
               onClick={addExperience}
@@ -227,47 +314,60 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
             </button>
           </div>
 
-          {cvData.experience.map((exp, index) => (
-            <div key={index} className="mb-4 space-y-2 border-b pb-4 last:border-b-0">
-              <input
-                type="text"
-                placeholder="Job Title"
-                value={exp.jobTitle}
-                onChange={(e) => updateExperience(index, "jobTitle", e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <input
-                type="text"
-                placeholder="Company Name"
-                value={exp.company}
-                onChange={(e) => updateExperience(index, "company", e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-              <div className="grid grid-cols-2 gap-2">
+          {cvData.experience.length === 0 ? (
+            <p className="text-gray-500 text-sm">No experience added yet. This is optional.</p>
+          ) : (
+            cvData.experience.map((exp, index) => (
+              <div key={index} className="mb-4 space-y-2 border-b pb-4 last:border-b-0">
+                <div className="flex justify-between items-start">
+                  <input
+                    type="text"
+                    placeholder="Job Title"
+                    value={exp.jobTitle}
+                    onChange={(e) => updateExperience(index, "jobTitle", e.target.value)}
+                    className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeExperience(index)}
+                    className="ml-2 text-red-600 hover:text-red-700 px-2"
+                  >
+                    ✕
+                  </button>
+                </div>
                 <input
                   type="text"
-                  placeholder="Start Date"
-                  value={exp.startDate}
-                  onChange={(e) => updateExperience(index, "startDate", e.target.value)}
+                  placeholder="Company Name"
+                  value={exp.company}
+                  onChange={(e) => updateExperience(index, "company", e.target.value)}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-                <input
-                  type="text"
-                  placeholder="End Date"
-                  value={exp.endDate}
-                  onChange={(e) => updateExperience(index, "endDate", e.target.value)}
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Start Date"
+                    value={exp.startDate}
+                    onChange={(e) => updateExperience(index, "startDate", e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="End Date or Present"
+                    value={exp.endDate}
+                    onChange={(e) => updateExperience(index, "endDate", e.target.value)}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <textarea
+                  placeholder="Describe your responsibilities and achievements..."
+                  value={exp.responsibilities}
+                  onChange={(e) => updateExperience(index, "responsibilities", e.target.value)}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  rows={3}
                 />
               </div>
-              <textarea
-                placeholder="Describe your responsibilities and achievements..."
-                value={exp.responsibilities}
-                onChange={(e) => updateExperience(index, "responsibilities", e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                rows={3}
-              />
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Education Section */}
@@ -380,6 +480,37 @@ export default function CVForm({ initialData, onSave, loading = false }: CVFormP
               <div>
                 <h2 className="text-xl font-bold mb-2 border-b pb-1">Summary</h2>
                 <p className="text-sm">{cvData.summary}</p>
+              </div>
+            )}
+
+            {/* Projects */}
+            {cvData.projects.some((p) => p.title) && (
+              <div>
+                <h2 className="text-xl font-bold mb-2 border-b pb-1">Projects</h2>
+                {cvData.projects.map(
+                  (project, index) =>
+                    project.title && (
+                      <div key={index} className="mb-4">
+                        <h3 className="font-bold text-sm">{project.title}</h3>
+                        {project.role && (
+                          <p className="text-blue-600 text-sm">{project.role}</p>
+                        )}
+                        {project.techStack.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {project.techStack.map((tech, idx) => (
+                              <span
+                                key={idx}
+                                className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-xs"
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-sm mt-1">{project.description}</p>
+                      </div>
+                    )
+                )}
               </div>
             )}
 
