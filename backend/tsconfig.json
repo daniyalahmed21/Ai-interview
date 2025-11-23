@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "lib": [
+            "ES2020"
+        ],
+        "moduleResolution": "node",
+        "module": "ESNext",
+        "target": "ES2023",
+        "strict": true,
+        "esModuleInterop": true,
+        "ignoreDeprecations": "6.0",
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
