@@ -19,10 +19,10 @@ const loginSchema = z.object({
  */
 router.post("/signup", async (req, res) => {
     try {
-        console.log("Signup request received:", {
-            name: req.body.name,
-            email: req.body.email,
-        });
+        // console.log("Signup request received:", {
+        //   name: req.body.name,
+        //   email: req.body.email,
+        // });
         // Validate input data
         const validatedData = signupSchema.parse(req.body);
         const { name, email, password } = validatedData;

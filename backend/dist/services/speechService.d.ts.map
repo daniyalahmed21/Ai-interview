@@ -1,0 +1,1 @@
+{"version":3,"file":"speechService.d.ts","sourceRoot":"","sources":["../../src/services/speechService.ts"],"names":[],"mappings":"AAAA,UAAU,mBAAmB;IAC3B,IAAI,EAAE,MAAM,CAAC;CACd;AAED,UAAU,YAAY;IACpB,QAAQ,EAAE,MAAM,CAAC;CAClB;AAED,wBAAsB,eAAe,CAAC,UAAU,EAAE,MAAM,GAAG,OAAO,CAAC,mBAAmB,CAAC,CAmBtF;AAED,wBAAsB,cAAc,CAAC,IAAI,EAAE,MAAM,GAAG,OAAO,CAAC,YAAY,CAAC,CAUxE"}

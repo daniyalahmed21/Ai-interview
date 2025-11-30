@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import Terminal from './Terminal'
+import { initSocket, disconnectSocket } from '../lib/socket'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 
@@ -13,10 +15,6 @@ interface InterviewInterfaceProps {
 const languages = [
   { value: 'javascript', label: 'JavaScript' },
   { value: 'python', label: 'Python' },
-  { value: 'cpp', label: 'C++' },
-  { value: 'java', label: 'Java' },
-  { value: 'typescript', label: 'TypeScript' },
-  { value: 'csharp', label: 'C#' },
 ]
 
 export default function InterviewInterface({ fieldId }: InterviewInterfaceProps) {
@@ -24,18 +22,16 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
   const [isInterviewStarted, setIsInterviewStarted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(1)
   const [totalQuestions] = useState(5)
-  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
-  const [recorder, setRecorder] = useState<MediaRecorder | null>(null)
   const [code, setCode] = useState('// Write your code here\n')
   const [selectedLanguage, setSelectedLanguage] = useState('javascript')
-  const [output, setOutput] = useState('')
-  const [isRunning, setIsRunning] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const smallVideoRef = useRef<HTMLVideoElement>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recorderChunks, setRecorderChunks] = useState<Blob[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [isStopped, setIsStopped] = useState(false)
+  const [transcript, setTranscript] = useState<Array<{ speaker: string; text: string; timestamp: Date }>>([])
+  const [isListening, setIsListening] = useState(false)
+  
+  const socketRef = useRef<any>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const codeSnapshotIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const questions = [
     {
@@ -67,9 +63,10 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
 
   const startInterview = async () => {
     try {
-      // Create session first
       const token = localStorage.getItem('token')
-      const sessionResponse = await fetch('http://localhost:5000/api/interview/session', {
+      
+      // Create session
+      const sessionResponse = await fetch('http://localhost:5000/api/interview/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,86 +80,90 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
         throw new Error(sessionData.message || 'Failed to create session')
       }
 
-      setSessionId(sessionData.sessionId)
+      const newSessionId = sessionData.sessionId
+      setSessionId(newSessionId)
 
-      // Start camera and recording
+      // Initialize Socket.IO
+      const socket = initSocket()
+      socketRef.current = socket
+
+      // Join room
+      socket.emit('join-room', newSessionId)
+
+      // Listen for transcript updates
+      socket.on('transcript-update', (data: any) => {
+        setTranscript(prev => [...prev, {
+          speaker: data.speaker,
+          text: data.text,
+          timestamp: new Date(data.timestamp)
+        }])
+      })
+
+      // Listen for terminal output
+      socket.on('terminal-output', (data: any) => {
+        console.log('Terminal output:', data)
+      })
+
+      // Start audio capture
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
         audio: true,
       })
+      mediaStreamRef.current = stream
 
-      setMediaStream(stream)
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-      if (smallVideoRef.current) {
-        smallVideoRef.current.srcObject = stream
-      }
+      // Setup audio processing
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+      const source = audioContext.createMediaStreamSource(stream)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
 
-      const chunks: Blob[] = []
-      setRecorderChunks(chunks)
+      source.connect(processor)
+      processor.connect(audioContext.destination)
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp8,opus',
-      })
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          chunks.push(event.data)
-          setRecorderChunks([...chunks])
-        }
+      processor.onaudioprocess = (e) => {
+        const audioData = e.inputBuffer.getChannelData(0)
+        // Convert to buffer and send via socket
+        const buffer = Buffer.from(audioData.buffer)
+        socket.emit('audio-stream', { chunk: buffer.toString('base64') })
       }
 
-      setRecorder(mediaRecorder)
       setIsInterviewStarted(true)
-      setIsRecording(true)
-      setIsStopped(false)
-      mediaRecorder.start(1000) // Collect data every second
+      setIsListening(true)
+
+      // Start code snapshot interval (every 10 seconds)
+      codeSnapshotIntervalRef.current = setInterval(() => {
+        socket.emit('code-snapshot', {
+          sessionId: newSessionId,
+          code,
+          language: selectedLanguage,
+        })
+      }, 10000)
+
+      // Speak first question
+      speakQuestion(questions[0].question)
+
     } catch (error) {
       console.error('Error starting interview:', error)
       alert('Could not start interview. Please check permissions and try again.')
     }
   }
 
-  const stopRecording = async () => {
-    if (!recorder || !isRecording || !sessionId) {
-      return
-    }
-
-    // Stop recording
-    recorder.stop()
-    setIsRecording(false)
-    setIsStopped(true)
-
-    // Wait a bit for final data
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    // Upload video
-    if (recorderChunks.length > 0) {
-      const blob = new Blob(recorderChunks, { type: 'video/webm' })
-      const formData = new FormData()
-      formData.append('video', blob, `question-${currentQuestion}.webm`)
-      formData.append('questionId', currentQuestion.toString())
-      formData.append('fieldId', fieldId)
-      formData.append('sessionId', sessionId)
-
-      const token = localStorage.getItem('token')
-      try {
-        const response = await fetch('http://localhost:5000/api/interview/upload', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.error('Upload failed:', errorData)
-        }
-      } catch (error) {
-        console.error('Error uploading video:', error)
-      }
+  const speakQuestion = async (text: string) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/interview/speak', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      })
+      const data = await response.json()
+      
+      // In production, play the audio from data.audioUrl
+      // For now, use browser's speech synthesis as fallback
+      const utterance = new SpeechSynthesisUtterance(text)
+      window.speechSynthesis.speak(utterance)
+    } catch (error) {
+      console.error('Error speaking question:', error)
     }
   }
 
@@ -170,118 +171,99 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
     if (currentQuestion < totalQuestions) {
       setCurrentQuestion(currentQuestion + 1)
       setCode('// Write your code here\n')
-      setOutput('')
-      setIsStopped(false)
-      setRecorderChunks([])
-
-      // Start recording for next question
-      if (mediaStream) {
-        const chunks: Blob[] = []
-        setRecorderChunks(chunks)
-
-        const newRecorder = new MediaRecorder(mediaStream, {
-          mimeType: 'video/webm;codecs=vp8,opus',
-        })
-
-        newRecorder.ondataavailable = (event) => {
-          if (event.data && event.data.size > 0) {
-            chunks.push(event.data)
-            setRecorderChunks([...chunks])
-          }
-        }
-
-        setRecorder(newRecorder)
-        setIsRecording(true)
-        newRecorder.start(1000)
-      }
+      speakQuestion(questions[currentQuestion].question)
     } else {
-      // Interview completed
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop())
-      }
-      
-      // Update dashboard stats
-      const token = localStorage.getItem('token')
-      try {
-        await fetch('http://localhost:5000/api/interview/count', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-        // Trigger refresh event for dashboard
-        window.dispatchEvent(new Event('dashboard-refresh'))
-      } catch (error) {
-        console.error('Error updating stats:', error)
-      }
-
-      alert('Interview completed! Redirecting to dashboard...')
-      router.push('/dashboard')
+      // End interview
+      await endInterview()
     }
   }
 
-  const runCode = async () => {
-    setIsRunning(true)
-    setOutput('Running...\n')
-
+  const endInterview = async () => {
     try {
+      // Stop audio
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+
+      // Stop code snapshots
+      if (codeSnapshotIntervalRef.current) {
+        clearInterval(codeSnapshotIntervalRef.current)
+      }
+
+      // Disconnect socket
+      disconnectSocket()
+
+      // Trigger evaluation
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5000/api/interview/run-code', {
+      await fetch(`http://localhost:5000/api/interview/${sessionId}/end`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          code,
-          language: selectedLanguage,
-        }),
       })
 
-      const data = await response.json()
-      if (response.ok) {
-        setOutput(data.output || data.result || 'Code executed successfully')
-      } else {
-        setOutput(`Error: ${data.error || data.message || 'Failed to execute code'}`)
-      }
+      // Redirect to report
+      router.push(`/interview/${sessionId}/report`)
     } catch (error) {
-      setOutput(`Error: ${error instanceof Error ? error.message : 'Failed to execute code. Please check your connection.'}`)
-    } finally {
-      setIsRunning(false)
+      console.error('Error ending interview:', error)
+      router.push('/dashboard')
+    }
+  }
+
+  const handleTerminalInput = (input: string) => {
+    if (socketRef.current && sessionId) {
+      socketRef.current.emit('terminal-input', {
+        sessionId,
+        input,
+      })
+    }
+  }
+
+  const handleCodeChange = (value: string | undefined) => {
+    const newCode = value || ''
+    setCode(newCode)
+    
+    // Emit code update via socket
+    if (socketRef.current && sessionId) {
+      socketRef.current.emit('code-update', {
+        sessionId,
+        code: newCode,
+        language: selectedLanguage,
+      })
     }
   }
 
   useEffect(() => {
     return () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop())
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop())
       }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+      if (codeSnapshotIntervalRef.current) {
+        clearInterval(codeSnapshotIntervalRef.current)
+      }
+      disconnectSocket()
     }
-  }, [mediaStream])
+  }, [])
 
   const currentQuestionData = questions[currentQuestion - 1]
 
-  // Get Monaco language mapping
-  const getMonacoLanguage = (lang: string) => {
-    const mapping: { [key: string]: string } = {
-      javascript: 'javascript',
-      python: 'python',
-      cpp: 'cpp',
-      java: 'java',
-      typescript: 'typescript',
-      csharp: 'csharp',
-    }
-    return mapping[lang] || 'javascript'
-  }
-
   return (
-    <div className="min-h-screen bg-background text-text-primary">
-      <nav className="bg-white border-b border-border px-6 py-4 shadow-sm">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">P</span>
             </div>
-            <span className="text-xl font-bold text-primary">PrepView</span>
+            <span className="text-xl font-bold text-primary">PrepView AI Interview</span>
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-gray-600">
@@ -289,7 +271,7 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
             </span>
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-gray-600 hover:text-text-primary transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors"
             >
               Exit Interview
             </button>
@@ -297,78 +279,77 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
         </div>
       </nav>
 
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)] pb-24">
-        {/* Left Side - Question always visible, then video and simulator */}
-        <div className="w-full lg:w-1/2 flex flex-col p-6 space-y-6">
-          {/* Question Card - Always on top */}
-          <div className="bg-white rounded-xl p-6 border border-border shadow-md">
-            <h3 className="text-xl font-bold mb-4 text-accent">Current Question</h3>
-            <h4 className="text-lg font-semibold mb-2 text-text-primary">{currentQuestionData.question}</h4>
-            <p className="text-gray-600">{currentQuestionData.description}</p>
+      {/* Main Content */}
+      <div className="grid grid-cols-12 gap-4 p-4 h-[calc(100vh-80px)]">
+        {/* Left Column - Question, Transcript, AI Tips */}
+        <div className="col-span-3 flex flex-col space-y-4">
+          {/* Question Card */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-500 mb-2">CURRENT QUESTION</h3>
+            <h4 className="text-lg font-bold mb-2 text-gray-900">{currentQuestionData.question}</h4>
+            <p className="text-sm text-gray-600">{currentQuestionData.description}</p>
           </div>
 
-          {/* Video Preview */}
-          <div className="bg-white rounded-xl border border-border overflow-hidden shadow-md">
-            <div className="relative w-full aspect-video bg-gray-900">
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-              />
+          {/* Transcript */}
+          <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm flex-1 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">LIVE TRANSCRIPT</h3>
+              <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {transcript.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Speak to see your transcript here...</p>
+              ) : (
+                transcript.map((item, idx) => (
+                  <div key={idx} className={`text-sm p-2 rounded ${item.speaker === 'ai' ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                    <span className="font-semibold text-xs text-gray-500">
+                      {item.speaker === 'ai' ? '🤖 AI' : '👤 You'}:
+                    </span>
+                    <p className="text-gray-700 mt-1">{item.text}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
-          {/* AI Simulator Circle */}
-          <div className="bg-white rounded-xl p-8 border border-border flex items-center justify-center shadow-md">
-            <div className="relative">
-              <div className="w-48 h-48 rounded-full bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center shadow-2xl animate-pulse">
-                <div className="w-40 h-40 rounded-full bg-white flex items-center justify-center">
-                  <div className="text-6xl">🤖</div>
-                </div>
-              </div>
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-success rounded-full border-2 border-white animate-ping"></div>
-            </div>
+          {/* AI Tips */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">💡 AI TIPS</h3>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li>• Explain your thought process clearly</li>
+              <li>• Consider edge cases</li>
+              <li>• Test your code before submitting</li>
+            </ul>
           </div>
         </div>
 
-        {/* Right Side - Monaco Editor with language selector and output */}
-        <div className="w-full lg:w-1/2 flex flex-col p-6">
-          <div className="bg-white rounded-xl border border-border overflow-hidden flex flex-col h-full shadow-md relative">
-            {/* Editor Header with Language Selector */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-text-primary">Code Editor</h3>
-              <div className="flex items-center space-x-3">
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="px-3 py-1.5 border border-border rounded-lg text-sm font-medium text-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                >
-                  {languages.map((lang) => (
-                    <option key={lang.value} value={lang.value}>
-                      {lang.label}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={runCode}
-                  disabled={isRunning}
-                  className="bg-button-primary text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRunning ? 'Running...' : 'Run'}
-                </button>
-              </div>
+        {/* Center Column - Code Editor */}
+        <div className="col-span-6 flex flex-col">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col h-full shadow-sm">
+            {/* Editor Header */}
+            <div className="p-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-700">CODE EDITOR</h3>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {languages.map((lang) => (
+                  <option key={lang.value} value={lang.value}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Code Editor */}
-            <div className="flex-1 relative" style={{ minHeight: '300px' }}>
+            {/* Monaco Editor */}
+            <div className="flex-1">
               <MonacoEditor
                 height="100%"
-                language={getMonacoLanguage(selectedLanguage)}
-                theme="vs"
+                language={selectedLanguage}
+                theme="vs-dark"
                 value={code}
-                onChange={(value) => setCode(value || '')}
+                onChange={handleCodeChange}
                 options={{
                   minimap: { enabled: true },
                   fontSize: 14,
@@ -376,64 +357,57 @@ export default function InterviewInterface({ fieldId }: InterviewInterfaceProps)
                   automaticLayout: true,
                 }}
               />
-              {/* Small camera box in right bottom corner - Desktop only */}
-              <div className="hidden lg:block absolute bottom-4 right-4 w-32 h-32 bg-gray-900 rounded-lg overflow-hidden border-2 border-accent shadow-xl z-10">
-                <video
-                  ref={smallVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Output Section */}
-            <div className="border-t border-border">
-              <div className="p-4 bg-gray-50">
-                <h4 className="text-sm font-semibold text-text-primary mb-2">Output</h4>
-                <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 min-h-[100px] max-h-[200px] overflow-y-auto">
-                  <pre className="whitespace-pre-wrap">{output || 'Output will appear here...'}</pre>
-                </div>
-              </div>
+        {/* Right Column - Terminal and Notes */}
+        <div className="col-span-3 flex flex-col space-y-4">
+          {/* Terminal */}
+          <div className="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+            <div className="p-3 border-b border-gray-200 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-700">TERMINAL</h3>
             </div>
+            <div className="h-[calc(100%-48px)]">
+              <Terminal onInput={handleTerminalInput} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="h-48 bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">NOTES</h3>
+            <textarea
+              className="w-full h-[calc(100%-32px)] text-sm p-2 border border-gray-200 rounded resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Take notes here..."
+            />
           </div>
         </div>
       </div>
 
-      {/* Bottom Controls - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border px-6 py-4 shadow-lg z-20">
+      {/* Bottom Controls */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 shadow-lg">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           {!isInterviewStarted ? (
             <button
               onClick={startInterview}
-              className="bg-button-primary text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl w-full md:w-auto"
+              className="bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl w-full md:w-auto"
             >
-              Start Interview
+              🎤 Start AI Interview
             </button>
           ) : (
-            <div className="flex items-center justify-between w-full md:w-auto md:space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-danger animate-pulse' : 'bg-gray-400'}`}></div>
-                <span className="text-text-primary">
-                  {isRecording ? 'Recording...' : isStopped ? 'Stopped' : 'Paused'}
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center space-x-3">
+                <div className={`w-3 h-3 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                <span className="text-sm text-gray-600">
+                  {isListening ? '🎤 Listening...' : 'Paused'}
                 </span>
               </div>
-              {isRecording ? (
-                <button
-                  onClick={stopRecording}
-                  className="bg-danger text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl mt-4 md:mt-0 w-full md:w-auto"
-                >
-                  Stop Recording
-                </button>
-              ) : isStopped ? (
-                <button
-                  onClick={handleNextQuestion}
-                  className="bg-button-primary text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl mt-4 md:mt-0 w-full md:w-auto"
-                >
-                  {currentQuestion < totalQuestions ? 'Next Question' : 'Finish Interview'}
-                </button>
-              ) : null}
+              <button
+                onClick={handleNextQuestion}
+                className="bg-primary text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg hover:shadow-xl"
+              >
+                {currentQuestion < totalQuestions ? 'Next Question →' : 'Finish Interview'}
+              </button>
             </div>
           )}
         </div>

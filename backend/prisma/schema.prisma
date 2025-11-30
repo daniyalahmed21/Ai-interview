@@ -52,11 +52,52 @@ model InterviewSession {
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fieldId       String
   questionId    Int
-  videoPath     String
-  videoFilename String
+  videoPath     String?
+  videoFilename String?
+  status        String   @default("in_progress") // in_progress, completed, abandoned
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transcripts   Transcript[]
+  codeSnapshots CodeSnapshot[]
+  evaluation    Evaluation?
 
   @@index([userId])
   @@index([fieldId])
   @@index([sessionId])
 }
+
+model Transcript {
+  id                 String           @id @default(cuid())
+  interviewSessionId String
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+  speaker            String           // "candidate" or "ai"
+  text               String
+  timestamp          DateTime         @default(now())
+
+  @@index([interviewSessionId])
+}
+
+model CodeSnapshot {
+  id                 String           @id @default(cuid())
+  interviewSessionId String
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+  code               String
+  language           String
+  timestamp          DateTime         @default(now())
+
+  @@index([interviewSessionId])
+}
+
+model Evaluation {
+  id                 String           @id @default(cuid())
+  interviewSessionId String           @unique
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+  
+  scores             Json             // { clarity, understanding, correctness, etc. }
+  feedback           Json             // { strengths, weaknesses, suggestions }
+  overallScore       Int
+  
+  createdAt          DateTime         @default(now())
+}
+

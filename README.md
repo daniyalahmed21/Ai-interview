@@ -1,259 +1,264 @@
-# PrepView - AI Interview Simulator
+# PrepView - AI-Powered Interview Practice Platform
 
-A production-ready AI interview simulator application built with Next.js, Node.js, Express, and Prisma.
+A production-ready AI interview simulator with real-time voice interaction, live coding environment, and automated evaluation.
 
-## Features
+## 🌟 Features
 
+### Core Features
 - 🏠 **Beautiful Homepage** with smooth scrolling sections
 - 🔐 **Authentication** (Login/Signup) with JWT
-- 📄 **Enhanced CV Builder** with:
-  - Live preview
-  - **Projects section** with tech stack badges
-  - **Optional work experience** (perfect for students)
-  - Optional fields (phone, location, social links)
-  - Real-time form validation
-  - Add/remove functionality for all sections
-- 📊 **Dashboard** with multiple sections
-- 💻 **AI Interview Simulator** with:
-  - Real-time coding in Monaco Editor
-  - Video recording per question
-  - Multiple IT/CS interview fields
-- 📈 **Performance Analytics**
+- 📄 **Enhanced CV Builder** with projects, experience, and live preview
+- 📊 **User Dashboard** with interview history and analytics
 
-## Tech Stack
+### AI Interview Platform (NEW)
+- 🎤 **Voice Interview** - Real-time speech-to-text and AI-generated questions
+- 💻 **Live Coding Environment** - Monaco Editor with terminal integration
+- 🤖 **AI Evaluation** - Automated feedback on 7 key metrics
+- 📹 **Session Recording** - Full transcript and code snapshot playback
+- ⚡ **Real-time Sync** - WebSocket-based live updates
+
+## 🏗️ Tech Stack
 
 ### Frontend
 - Next.js 14 (App Router)
 - TypeScript
 - Tailwind CSS
-- Monaco Editor
-- React Hooks
+- Monaco Editor (Code editing)
+- xterm.js (Terminal emulation)
+- Socket.IO Client (Real-time)
 
 ### Backend
-- Node.js
-- Express.js
+- Node.js + Express.js
+- TypeScript
+- Socket.IO (WebSockets)
 - Prisma ORM
-- Neon (PostgreSQL)
+- SQLite (Dev) / PostgreSQL (Prod)
 - JWT Authentication
-- Multer (File Upload)
 
-## Getting Started
+### AI Services (Mock → Production Ready)
+- Speech-to-Text (Mock → OpenAI Whisper)
+- Text-to-Speech (Mock → ElevenLabs/Google)
+- Code Execution (Safe sandbox)
+- AI Evaluation (Mock → GPT-4)
+
+## 🚀 Quick Start
 
 ### Prerequisites
+- Node.js 18+
+- Python 3.x (for code execution)
+- Docker (optional)
 
-- Node.js 18+ installed
-- npm or yarn
-- Neon PostgreSQL database
+### Option 1: Run Locally
 
-### Installation
+```bash
+# Backend
+cd backend
+npm install
+npx prisma generate
+npx prisma db push
+npm run dev
+# Server: http://localhost:5000
 
-1. **Clone the repository**
-   ```bash
-   cd prepview
-   ```
+# Frontend (new terminal)
+cd frontend
+npm install
+npm run dev
+# App: http://localhost:3000
+```
 
-2. **Install dependencies for both frontend and backend**
-   ```bash
-   npm run install:all
-   ```
+### Option 2: Docker Compose
 
-   Or install separately:
-   ```bash
-   # Frontend
-   cd frontend
-   npm install --production=false
+```bash
+docker-compose up
+```
 
-   # Backend
-   cd ../backend
-   npm install
-   ```
+## 🧪 Testing
 
-3. **Set up environment variables**
+```bash
+cd backend
+npm test
+```
 
-   Create a `frontend/.env` file:
-   ```env
-   NEXT_PUBLIC_API_URL=http://localhost:5000
-   VITE_SUPABASE_URL=your-supabase-url
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
+**Test Coverage:**
+- ✅ Socket.IO Service (4 tests)
+- ✅ Code Execution Service (3 tests)
+- ✅ Speech Service (2 tests)
+- ✅ Evaluation Service (2 tests)
 
-   Create a `backend/.env` file:
-   ```env
-   DATABASE_URL="your-database-connection-string"
-   JWT_SECRET="your-super-secret-jwt-key"
-   PORT=5000
-   ```
+**Result:** 11 tests passing
 
-4. **Run the development server**
-
-   From the root directory:
-   ```bash
-   npm run dev
-   ```
-
-   Or run separately:
-
-   Frontend (Terminal 1):
-   ```bash
-   npm run dev:frontend
-   ```
-
-   Backend (Terminal 2):
-   ```bash
-   npm run dev:backend
-   ```
-
-5. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 prepview/
-├── frontend/              # Next.js frontend application
-│   ├── app/              # Next.js app directory
+├── frontend/              # Next.js application
+│   ├── app/              # Pages (App Router)
 │   │   ├── page.tsx      # Homepage
-│   │   ├── login/        # Login page
-│   │   ├── signup/       # Signup page
-│   │   ├── cv-creation/  # CV builder page
-│   │   ├── dashboard/    # Dashboard page
-│   │   └── interview/    # Interview pages
+│   │   ├── login/        # Authentication
+│   │   ├── signup/
+│   │   ├── cv-creation/  # CV Builder
+│   │   ├── dashboard/    # User Dashboard
+│   │   └── interview/    # Interview Interface
 │   ├── components/       # React components
-│   │   ├── CVForm.tsx    # Enhanced CV form with projects
-│   │   ├── Navbar.tsx
-│   │   ├── Hero.tsx
-│   │   ├── Features.tsx
-│   │   ├── InterviewInterface.tsx
+│   │   ├── Terminal.tsx  # xterm.js terminal
+│   │   ├── CVForm.tsx
 │   │   └── ...
-│   ├── prisma/           # Database schema
-│   ├── supabase/         # Supabase migrations
-│   ├── package.json
-│   └── next.config.js
+│   └── lib/
+│       └── socket.ts     # Socket.IO client
 │
-├── backend/              # Express.js backend API
-│   ├── server.js         # Main server file
-│   ├── routes/           # API routes
-│   │   ├── auth.js       # Authentication endpoints
-│   │   ├── cv.js         # CV endpoints
-│   │   └── interview.js  # Interview endpoints
-│   ├── services/         # Business logic
-│   ├── middleware/       # Auth middleware
-│   ├── lib/             # Database client
-│   ├── package.json
-│   └── .env
+├── backend/              # Express API
+│   ├── src/
+│   │   ├── server.ts     # Main server + Socket.IO
+│   │   ├── services/     # Business logic
+│   │   │   ├── socketService.ts
+│   │   │   ├── speechService.ts
+│   │   │   ├── codeExecutionService.ts
+│   │   │   └── evaluationService.ts
+│   │   ├── routes/       # API endpoints
+│   │   └── middleware/   # Auth middleware
+│   └── prisma/
+│       └── schema.prisma # Database schema
 │
-└── package.json          # Root package.json for monorepo scripts
+└── docker-compose.yml    # Container orchestration
 ```
 
-## API Endpoints
+## 🗄️ Database Schema
+
+### Core Models
+- **User** - Authentication and profile
+- **CV** - Resume data (JSONB)
+- **InterviewSession** - Interview metadata
+
+### AI Platform Models (NEW)
+- **Transcript** - Real-time voice transcriptions
+- **CodeSnapshot** - Periodic code saves (every 10s)
+- **Evaluation** - AI-generated scores and feedback
+
+## 🔌 API Endpoints
 
 ### Authentication
 - `POST /api/auth/signup` - User registration
 - `POST /api/auth/login` - User login
 
-### CV
+### CV Management
 - `GET /api/cv` - Get user's CV
-- `POST /api/cv` - Create CV
-- `PUT /api/cv` - Update CV
+- `POST /api/cv` - Create/update CV
 
-### Interview
-- `POST /api/interview/upload` - Upload interview video
-- `GET /api/interview/sessions` - Get user's interview sessions
+### Interview (NEW)
+- `POST /api/interview/start` - Create session
+- `POST /api/interview/end` - Trigger evaluation
+- `GET /api/interview/:id/report` - Get results
 
-## Database Schema
+### WebSocket Events
+- `join-room` - Join interview session
+- `audio-stream` - Send audio data
+- `code-update` - Sync code changes
+- `terminal-input` - Execute commands
 
-- **User**: User accounts
-- **CV**: User resumes
-- **InterviewSession**: Interview recordings
+## 🎯 Interview Flow
 
-## Features in Detail
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Socket.IO
+    participant Backend
+    participant AI Services
 
-### Homepage
-- Responsive navbar with smooth scrolling
-- Hero section
-- Features showcase
-- How it works section
-- Reviews/testimonials
+    User->>Frontend: Start Interview
+    Frontend->>Socket.IO: Connect & Join Room
+    User->>Frontend: Speak Answer
+    Frontend->>Socket.IO: Stream Audio
+    Socket.IO->>Backend: Process Audio
+    Backend->>AI Services: Transcribe (STT)
+    AI Services-->>Backend: Text
+    Backend-->>Socket.IO: Transcript
+    Socket.IO-->>Frontend: Update UI
+    
+    User->>Frontend: Write Code
+    Frontend->>Socket.IO: Code Update
+    Socket.IO->>Backend: Execute Code
+    Backend-->>Socket.IO: Output
+    Socket.IO-->>Frontend: Terminal Output
+    
+    User->>Frontend: End Interview
+    Frontend->>Backend: Trigger Evaluation
+    Backend->>AI Services: Analyze Session
+    AI Services-->>Backend: Scores & Feedback
+    Backend-->>Frontend: Report
+```
 
-### CV Builder
-- Split-screen interface with real-time preview
-- **Projects Section** - Showcase personal and academic projects with:
-  - Project title and role
-  - Tech stack (displayed as badges)
-  - Detailed project description
-  - Add/remove functionality
-- **Optional Work Experience** - Perfect for students without work history
-- **Flexible Fields** - Optional phone, location, LinkedIn, and GitHub
-- Professional Summary (optional)
-- Education with Final Year Project field
-- Skills with dynamic addition
+## 🔧 Configuration
 
-### Interview Interface
-- AI simulator visualization
-- Monaco code editor
-- Camera recording
-- Question-by-question video uploads
-- Multiple IT/CS fields (Data Science, Software Engineering, etc.)
+### Backend (.env)
+```env
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="your-secret-key"
+PORT=5000
+```
 
-## Recent Updates
+### Frontend (.env)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
+```
 
-### Version 2.0 - Enhanced CV Builder & Monorepo Structure
+## 📊 AI Evaluation Metrics
 
-**🎨 CV Builder Improvements:**
-- ✨ Added Projects section for showcasing personal and academic projects
-- 🔧 Made work experience optional (perfect for students and early-career professionals)
-- 📝 Optional fields for phone, location, LinkedIn, and GitHub URLs
-- 🎯 Tech stack badges in project display
-- ➕ Add/remove functionality for both projects and experience entries
-- 👁️ Real-time preview with improved UI
+The platform evaluates candidates on:
+1. **Clarity** - Communication effectiveness
+2. **Understanding** - Problem comprehension
+3. **Correctness** - Solution accuracy
+4. **Code Quality** - Clean code practices
+5. **Test Coverage** - Testing approach
+6. **Time Management** - Efficiency
+7. **Confidence** - Self-assurance
 
-**🏗️ Project Structure:**
-- 📁 Reorganized into monorepo structure with separate `frontend/` and `backend/` directories
-- 📦 Independent package management for frontend and backend
-- 🚀 Improved development workflow with unified scripts
-- 🔄 Better separation of concerns
+## 🚧 Roadmap
 
-**🛠️ Developer Experience:**
-- 💻 Added root-level scripts for easy development (`npm run dev`, `npm run install:all`)
-- 📝 Updated documentation with clear installation instructions
-- ⚡ Webpack path alias configuration for cleaner imports
-- 🔍 Enhanced TypeScript configuration
-- 🐛 Fixed NODE_ENV production build issues
+### Phase 1: MVP (Current)
+- ✅ Backend infrastructure
+- ✅ Mock AI services
+- ✅ Real-time communication
+- ✅ Database schema
+- ✅ Terminal component
+- ⏳ Frontend integration
 
-## Production Deployment
+### Phase 2: Production AI
+- [ ] OpenAI Whisper integration
+- [ ] GPT-4 evaluation
+- [ ] Docker code sandbox
+- [ ] Video recording
 
-1. Set up environment variables in your hosting platform
-2. Install dependencies:
-   ```bash
-   npm run install:all
-   ```
-3. Build the frontend:
-   ```bash
-   npm run build
-   ```
-4. Start both services:
-   ```bash
-   npm run start
-   ```
+### Phase 3: Advanced Features
+- [ ] Multi-language support
+- [ ] Custom question banks
+- [ ] Team collaboration
+- [ ] Analytics dashboard
 
-### Deploying Separately
+## 📚 Documentation
 
-**Frontend (Vercel/Netlify):**
-- Deploy the `frontend/` directory
-- Set environment variables: `NEXT_PUBLIC_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- Build command: `npm run build`
-- Output directory: `.next`
+- [Quick Start Guide](./QUICKSTART_AI_PLATFORM.md)
+- [Architecture Overview](./ARCHITECTURE.md)
+- [API Documentation](./backend/README.md)
 
-**Backend (Heroku/Railway/Render):**
-- Deploy the `backend/` directory
-- Set environment variables: `DATABASE_URL`, `JWT_SECRET`, `PORT`
-- Start command: `node server.js`
+## 🤝 Contributing
 
-## License
+We follow Test-Driven Development (TDD):
+1. Write tests first
+2. Implement feature
+3. Verify tests pass
+4. Refactor
+
+All services have corresponding test files in `__tests__/` directories.
+
+## 📝 License
 
 MIT
 
-## Support
+## 🙏 Acknowledgments
 
-For issues and questions, please open an issue on GitHub.
+Built with modern web technologies and AI capabilities to help candidates ace their technical interviews.
 
+---
+
+**Status:** Backend MVP Complete | Frontend Integration In Progress

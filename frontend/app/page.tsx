@@ -8,6 +8,7 @@ import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import Reviews from "@/components/Reviews";
 import Footer from "@/components/Footer";
+import ScrollToTop from "@/components/ScrollToTop";
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
       <HowItWorks />
       <Reviews />
       <Footer />
+      <ScrollToTop />
     </main>
   );
 }

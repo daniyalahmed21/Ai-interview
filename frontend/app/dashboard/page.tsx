@@ -30,7 +30,7 @@ export default function DashboardPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0B0F19]">
       <DashboardNavbar activeSection={activeSection} setActiveSection={setActiveSection} />
       <div className="pt-16">
         {activeSection === 'dashboard' && <DashboardHome />}

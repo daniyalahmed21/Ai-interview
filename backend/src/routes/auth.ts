@@ -26,10 +26,10 @@ type LoginInput = z.infer<typeof loginSchema>;
  */
 router.post("/signup", async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log("Signup request received:", {
-      name: req.body.name,
-      email: req.body.email,
-    });
+    // console.log("Signup request received:", {
+    //   name: req.body.name,
+    //   email: req.body.email,
+    // });
 
     // Validate input data
     const validatedData: SignupInput = signupSchema.parse(req.body);

@@ -293,4 +293,155 @@ router.get(
   }
 );
 
+// Start interview session (NEW)
+router.post(
+  "/start",
+  verifyToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { fieldId } = req.body;
+      const sessionId = `session-${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
+      // Create interview session in database
+      await prisma.interviewSession.create({
+        data: {
+          sessionId,
+          userId: req.userId!,
+          fieldId: fieldId || "unknown",
+          questionId: 1,
+        } as any,
+      });
+
+      res.json({
+        message: "Interview session started",
+        sessionId,
+        fieldId: fieldId || "unknown",
+      });
+    } catch (error) {
+      console.error("Start interview error:", error);
+      res.status(500).json({
+        message: "Error starting interview",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+);
+
+// End interview and trigger evaluation (NEW)
+router.post(
+  "/:sessionId/end",
+  verifyToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+
+      // Update session status
+      await prisma.interviewSession.updateMany({
+        where: { sessionId, userId: req.userId! },
+        data: { status: "completed" } as any,
+      });
+
+      // Import evaluation service
+      const { evaluateSession } = await import("../services/evaluationService.js");
+      
+      // Generate evaluation
+      const evaluation = await evaluateSession(sessionId);
+
+      // Save evaluation to database
+      const session = await prisma.interviewSession.findFirst({
+        where: { sessionId },
+      });
+
+      if (session) {
+        await (prisma as any).evaluation.create({
+          data: {
+            interviewSessionId: session.id,
+            scores: evaluation.scores as any,
+            feedback: evaluation.feedback as any,
+            overallScore: evaluation.overallScore,
+          },
+        });
+      }
+
+      res.json({
+        message: "Interview ended successfully",
+        sessionId,
+        evaluation,
+      });
+    } catch (error) {
+      console.error("End interview error:", error);
+      res.status(500).json({
+        message: "Error ending interview",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+);
+
+// Get interview report (NEW)
+router.get(
+  "/:sessionId/report",
+  verifyToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { sessionId } = req.params;
+
+      // Get session
+      const session = await prisma.interviewSession.findFirst({
+        where: { sessionId, userId: req.userId! },
+        include: {
+          transcripts: true,
+          codeSnapshots: {
+            orderBy: { timestamp: "desc" },
+          },
+          evaluation: true,
+        } as any,
+      }) as any;
+
+      if (!session) {
+        res.status(404).json({ message: "Interview session not found" });
+        return;
+      }
+
+      res.json({
+        session,
+        transcripts: session.transcripts,
+        codeSnapshots: session.codeSnapshots,
+        evaluation: session.evaluation,
+      });
+    } catch (error) {
+      console.error("Get report error:", error);
+      res.status(500).json({
+        message: "Error fetching report",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+);
+
+// Text-to-speech endpoint (NEW)
+router.post(
+  "/speak",
+  async (req, res: Response): Promise<void> => {
+    try {
+      const { text } = req.body;
+
+      // Import speech service
+      const { generateSpeech } = await import("../services/speechService.js");
+      
+      const result = await generateSpeech(text);
+
+      res.json(result);
+    } catch (error) {
+      console.error("Speak error:", error);
+      res.status(500).json({
+        message: "Error generating speech",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+);
+
 export default router;
